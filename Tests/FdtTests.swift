@@ -40,18 +40,21 @@ func `read child nodes`() throws {
 	#expect(t5)
 }
 
-//#[test]
-//fn name_outlives_fdt_and_node() {
-//	let dtb = include_bytes!("dtb/test_children.dtb");
-//	let name = {
-//		let fdt = Fdt::new(dtb).unwrap();
-//		let child1 = fdt.find_node("/child1").unwrap();
-//		child1.name()
-//	};
-//
-//	assert_eq!(name, "child1");
-//}
-//
+@Test
+func `name outlives fdt and node`() throws {
+	@_lifetime(copy bytes)
+	func name(using bytes: RawSpan) throws -> UTF8Span {
+		let fdt = try Fdt(parsing: bytes)
+		var it = fdt.root.children.makeIterableIterator()
+		let child1 = try it.next()!
+		return child1.name
+	}
+
+	let dtb = try include_bytes("test_children")
+	let t1 = try name(using: dtb.bytes).charactersEqual(to: "child1")
+	#expect(t1)
+}
+
 //#[test]
 //fn read_prop_values() {
 //	let dtb = include_bytes!("dtb/test_props.dtb");

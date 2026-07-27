@@ -80,49 +80,49 @@ public struct FdtChildren : ~Escapable {
 
 public extension FdtChildren {
 	@_lifetime(copy self)
+	@inlinable
 	func makeIterableIterator() -> FdtChildIter {
-		FdtChildIter.start(node)
+		var offset = node.offset
+		// Skip FDT_BEGIN_NODE
+		offset += FDT_TAGSIZE
+		offset = (try? node.fdt.find_string_end(from: offset)) ?? offset
+		offset = node.fdt.align_tag_offset(offset)
+		return FdtChildIter(fdt: node.fdt, space: node.parent_address_space, offset: offset)
 	}
 }
 
 /// An iterator over the children of a device tree node.
-public enum FdtChildIter : ~Escapable {
-	case start(FdtNode)
-	case running(Fdt, offset: UInt, space: AddressSpaceProperties)
+public struct FdtChildIter : ~Escapable {
+	@usableFromInline let fdt: Fdt
+	@usableFromInline let space: AddressSpaceProperties
+	@usableFromInline var offset: UInt
+
+	@_lifetime(copy fdt)
+	@usableFromInline
+	init(fdt: Fdt, space: AddressSpaceProperties, offset: UInt) {
+		self.fdt = fdt
+		self.space = space
+		self.offset = offset
+	}
 }
 
 public extension FdtChildIter {
-
 	@_lifetime(copy self)
 	@inlinable
 	mutating func next() throws(Fdt.ParsingError) -> FdtNode? {
-		switch self {
-		case let .start(node):
-			//TODO: move this setup to the FdtChildren initializer?
-			var offset = node.offset
-			// Skip FDT_BEGIN_NODE
-			offset += FDT_TAGSIZE
-			offset = try node.fdt.find_string_end(from: offset)
-			offset = node.fdt.align_tag_offset(offset)
-			self = .running(node.fdt, offset: offset, space: node.parent_address_space)
-			return try next()
-		case .running(let fdt, var offset, let space):
-			while true {
-				let token = try fdt.token(at: offset)
-				switch token {
-				case .begin_node:
-					let node_offset = offset
-					offset = try fdt.next_sibling_offset(from: offset)
-					self = .running(fdt, offset: offset, space: space)
-					return FdtNode(at: node_offset, in: fdt, space: space)
-				case .prop:
-					offset = try fdt.next_property_offset(from: offset + FDT_TAGSIZE, check_name: false)
-					self = .running(fdt, offset: offset, space: space)
-				case .end_node, .end:
-					return nil
-				case .nop:
-					offset += FDT_TAGSIZE
-				}
+		while true {
+			let token = try fdt.token(at: offset)
+			switch token {
+			case .begin_node:
+				let node_offset = offset
+				offset = try fdt.next_sibling_offset(from: offset)
+				return FdtNode(at: node_offset, in: fdt, space: space)
+			case .prop:
+				offset = try fdt.next_property_offset(from: offset + FDT_TAGSIZE, check_name: false)
+			case .end_node, .end:
+				return nil
+			case .nop:
+				offset += FDT_TAGSIZE
 			}
 		}
 	}

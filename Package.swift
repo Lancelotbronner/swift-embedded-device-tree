@@ -28,7 +28,10 @@ let package = Package(
 			],
 			resources: [
 				.copy("dtb"),
-			]
+			],
+			swiftSettings: [
+				.enableExperimentalFeature("Lifetimes"),
+			],
 		),
 	]
 )
