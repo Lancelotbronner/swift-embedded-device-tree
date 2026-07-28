@@ -7,16 +7,17 @@
 
 /// A node in a flattened device tree.
 public struct FdtNode : ~Escapable {
+	//TODO: let cursor: Ref<FdtCursor>
+	//TODO: let parent: Ref<FdtNode>
 	@usableFromInline let cursor: FdtCursor
-	public let name: UTF8Span
-	//TODO: replace with let parent: Ref<FdtNode>
+	public let name: FdtName
 	/// The `#address-cells` and `#size-cells` properties of this node's parent node.
 	@usableFromInline let parent_address_space: AddressSpaceProperties
 
 	@_lifetime(copy cursor, copy name)
 	@usableFromInline
 	init(
-		named name: UTF8Span,
+		named name: FdtName,
 		at cursor: FdtCursor,
 		space: AddressSpaceProperties = .default
 	) {
@@ -32,7 +33,10 @@ public struct FdtNode : ~Escapable {
 		space: AddressSpaceProperties = .default
 	) throws(Fdt.ParsingError) {
 		var cursor = cursor
-		name = try cursor.string()
+		cursor.offset += FDT_TAGSIZE
+		cursor.depth += 1
+		name = FdtName(bytes: try cursor.string())
+		cursor.align()
 		self.cursor = cursor
 		self.parent_address_space = space
 	}
@@ -47,7 +51,7 @@ public extension FdtNode {
 					return UTF8Span(unchecked: name.span.extracting(..<i), isKnownASCII: true)
 				}
 			}
-			return name
+			return name.utf8
 		}
 	}
 

@@ -24,13 +24,13 @@ func `read child nodes`() throws {
 
 	//TODO: #require does not support ~Escapable yet
 	let child1 = try children.next()!
-	let t1 = child1.name.charactersEqual(to: "child1")
+	let t1 = child1.name == "child1"
 	#expect(t1)
 	let t2 = child1.nameWithoutAddress.charactersEqual(to: "child1")
 	#expect(t2)
 
 	let child2 = try children.next()!
-	let t3 = child2.name.charactersEqual(to: "child2@42")
+	let t3 = child2.name == "child2@42"
 	#expect(t3)
 	let t4 = child2.nameWithoutAddress.charactersEqual(to: "child2")
 	#expect(t4)
@@ -43,7 +43,7 @@ func `read child nodes`() throws {
 @Test
 func `name outlives fdt and node`() throws {
 	@_lifetime(copy bytes)
-	func name(using bytes: RawSpan) throws -> UTF8Span {
+	func name(using bytes: RawSpan) throws -> FdtName {
 		let fdt = try Fdt(parsing: bytes)
 		var it = try fdt.root.children.makeIterableIterator()
 		let child1 = try it.next()!
@@ -51,7 +51,7 @@ func `name outlives fdt and node`() throws {
 	}
 
 	let dtb = try include_bytes("test_children")
-	let t1 = try name(using: dtb.bytes).charactersEqual(to: "child1")
+	let t1 = try name(using: dtb.bytes) == "child1"
 	#expect(t1)
 }
 
@@ -63,32 +63,32 @@ func `read prop values`() throws {
 	var children = root.children.makeIterableIterator()
 	let node = try children.next()!
 
-	let t1 = node.name.charactersEqual(to: "test-props")
-	print(String(copying: root.name), String(copying: node.name))
+	let t1 = node.name == "test-props"
+	print(root.name.string, node.name.string)
 	#expect(t1)
 
 	var properties = node.properties.makeIterableIterator()
 	var prop = try properties.next()!
 
-	let t2 = prop.name.charactersEqual(to: "u32-prop")
+	let t2 = prop.name == "u32-prop"
 	#expect(t2)
 	let t3 = try prop.asUInt32()
 	#expect(t3 == 0x1234_5678)
 
 	prop = try properties.next()!
-	let t4 = prop.name.charactersEqual(to: "u64-prop")
+	let t4 = prop.name == "u64-prop"
 	#expect(t4)
 	let t5 = try prop.asUInt64()
 	#expect(t5 == 0x1122_3344_5566_7788)
 
 	prop = try properties.next()!
-	let t6 = prop.name.charactersEqual(to: "str-prop")
+	let t6 = prop.name == "str-prop"
 	#expect(t6)
 	let t7 = try prop.asString().charactersEqual(to: "hello world")
 	#expect(t7)
 
 	prop = try properties.next()!
-	let t8 = prop.name.charactersEqual(to: "str-list-prop")
+	let t8 = prop.name == "str-list-prop"
 	#expect(t8)
 	var list = try prop.asStringList().makeIterableIterator()
 	let t9 = list.next()!.charactersEqual(to: "first")

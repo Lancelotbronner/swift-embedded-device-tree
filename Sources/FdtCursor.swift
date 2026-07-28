@@ -36,9 +36,20 @@ public struct FdtCursor : ~Escapable {
 		}
 	}
 
+	mutating func consume<T: BitwiseCopyable>(_ type: T.Type) throws(Fdt.ParsingError) -> T {
+		let value = fdt.bytes
+			.unsafeLoad(fromByteOffset: Int(bitPattern: offset), as: T.self)
+		offset += UInt(bitPattern: MemoryLayout<T>.size)
+		return value
+	}
+
+	mutating func propertyHeader() throws(Fdt.ParsingError) -> FdtPropertyHeader {
+		try consume(FdtPropertyHeader.self).byteSwapped
+	}
+
 	@_lifetime(copy self)
 	@usableFromInline
-	mutating func string() throws(Fdt.ParsingError) -> UTF8Span {
+	mutating func string() throws(Fdt.ParsingError) -> RawSpan {
 		let start = offset
 		while byte != 0 {
 			offset += 1
@@ -46,10 +57,12 @@ public struct FdtCursor : ~Escapable {
 				throw Fdt.ParsingError(.invalidString, at: offset)
 			}
 		}
-		let bytes = fdt.bytes.extracting(Int(bitPattern: start)...Int(bitPattern: offset))
-		let span = Span<UInt8>(_bytes: bytes)
-		let utf8 = UTF8Span(unchecked: span, isKnownASCII: true)
-		return utf8
+		// also consume the null byte
+		offset += 1
+
+		let bytes = fdt.bytes.extracting(Int(bitPattern: start)..<Int(bitPattern: offset))
+
+		return bytes
 	}
 }
 
@@ -74,7 +87,7 @@ public extension FdtCursor {
 			case .begin_node:
 				offset += FDT_TAGSIZE
 				depth += 1
-				let name = try string()
+				let name = FdtName(bytes: try string())
 				align()
 				let node = FdtNode(named: name, at: self)
 				return .node(node)
@@ -87,14 +100,14 @@ public extension FdtCursor {
 			case .end_node:
 				offset += FDT_TAGSIZE
 				if depth == 0 {
-					throw Fdt.ParsingError(.badToken(.end_node), at: offset)
+					throw Fdt.ParsingError(.badToken(token), at: offset)
 				}
 				depth -= 1
 			case .nop:
 				offset += FDT_TAGSIZE
 			case .end:
 				if depth > 0 {
-					throw Fdt.ParsingError(.badToken(.end), at: offset)
+					throw Fdt.ParsingError(.badToken(token), at: offset)
 				}
 				return nil
 			}

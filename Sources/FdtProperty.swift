@@ -7,12 +7,12 @@
 
 /// A property of a device tree node.
 public struct FdtProperty : ~Escapable {
-	public let name: UTF8Span
+	public let name: FdtName
 	public let bytes: RawSpan
 
 	@_lifetime(copy name, copy bytes)
 	init(name: UTF8Span, bytes: RawSpan) {
-		self.name = name
+		self.name = FdtName(bytes: name.span.bytes)
 		self.bytes = bytes
 	}
 
@@ -24,8 +24,7 @@ public struct FdtProperty : ~Escapable {
 			.byteSwapped
 
 		let nameBytes = try fdt.string(at: UInt(header.nameoff))
-		let nameSpan = Span<UInt8>(_bytes: nameBytes)
-		name = UTF8Span(unchecked: nameSpan, isKnownASCII: true)
+		name = FdtName(bytes: nameBytes)
 
 		let valueOffset = offset + 3 * FDT_TAGSIZE
 		bytes = fdt.bytes
@@ -36,7 +35,7 @@ public struct FdtProperty : ~Escapable {
 	/// The size of this property in bytes.
 	@usableFromInline
 	var size: UInt {
-		FDT_TAGSIZE + UInt(bitPattern: MemoryLayout<FdtPropertyHeader>.size + name.count + bytes.byteCount)
+		UInt(bitPattern: MemoryLayout<FdtPropertyHeader>.size + bytes.byteCount)
 	}
 }
 
