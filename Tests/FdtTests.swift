@@ -19,7 +19,7 @@ func include_bytes(_ name: String) throws -> Data {
 func `read child nodes`() throws {
 	let dtb = try include_bytes("test_children")
 	let fdt = try Fdt(parsing: dtb.bytes)
-	let root = fdt.root
+	let root = try fdt.root
 	var children = root.children.makeIterableIterator()
 
 	//TODO: #require does not support ~Escapable yet
@@ -45,7 +45,7 @@ func `name outlives fdt and node`() throws {
 	@_lifetime(copy bytes)
 	func name(using bytes: RawSpan) throws -> UTF8Span {
 		let fdt = try Fdt(parsing: bytes)
-		var it = fdt.root.children.makeIterableIterator()
+		var it = try fdt.root.children.makeIterableIterator()
 		let child1 = try it.next()!
 		return child1.name
 	}
@@ -59,12 +59,12 @@ func `name outlives fdt and node`() throws {
 func `read prop values`() throws {
 	let dtb = try include_bytes("test_props")
 	let fdt = try Fdt(parsing: dtb.bytes)
-	let root = fdt.root
+	let root = try fdt.root
 	var children = root.children.makeIterableIterator()
 	let node = try children.next()!
 
 	let t1 = node.name.charactersEqual(to: "test-props")
-	print(String(copying: root.name))
+	print(String(copying: root.name), String(copying: node.name))
 	#expect(t1)
 
 	var properties = node.properties.makeIterableIterator()
@@ -84,7 +84,7 @@ func `read prop values`() throws {
 	prop = try properties.next()!
 	let t6 = prop.name.charactersEqual(to: "str-prop")
 	#expect(t6)
-	let t7 = try prop.asStr().charactersEqual(to: "hello world")
+	let t7 = try prop.asString().charactersEqual(to: "hello world")
 	#expect(t7)
 
 	prop = try properties.next()!
@@ -93,9 +93,9 @@ func `read prop values`() throws {
 	var list = try prop.asStringList().makeIterableIterator()
 	let t9 = list.next()!.charactersEqual(to: "first")
 	#expect(t9)
-	let t10 = list.next()!.charactersEqual(to: "first")
+	let t10 = list.next()!.charactersEqual(to: "second")
 	#expect(t10)
-	let t11 = list.next()!.charactersEqual(to: "first")
+	let t11 = list.next()!.charactersEqual(to: "third")
 	#expect(t11)
 	let t12 = list.next() == nil
 	#expect(t12)

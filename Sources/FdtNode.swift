@@ -7,40 +7,41 @@
 
 /// A node in a flattened device tree.
 public struct FdtNode : ~Escapable {
-	@usableFromInline let fdt: Fdt
-	@usableFromInline let offset: UInt
+	@usableFromInline let cursor: FdtCursor
+	public let name: UTF8Span
+	//TODO: replace with let parent: Ref<FdtNode>
 	/// The `#address-cells` and `#size-cells` properties of this node's parent node.
 	@usableFromInline let parent_address_space: AddressSpaceProperties
 
-	@_lifetime(copy fdt)
+	@_lifetime(copy cursor, copy name)
 	@usableFromInline
 	init(
-		at offset: some FixedWidthInteger,
-		in fdt: Fdt,
+		named name: UTF8Span,
+		at cursor: FdtCursor,
 		space: AddressSpaceProperties = .default
 	) {
-		self.fdt = fdt
-		self.offset = UInt(offset)
+		self.cursor = cursor
+		self.name = name
+		self.parent_address_space = space
+	}
+
+	@_lifetime(copy cursor)
+	@usableFromInline
+	init(
+		at cursor: FdtCursor,
+		space: AddressSpaceProperties = .default
+	) throws(Fdt.ParsingError) {
+		var cursor = cursor
+		name = try cursor.string()
+		self.cursor = cursor
 		self.parent_address_space = space
 	}
 }
 
 public extension FdtNode {
-	var name: UTF8Span {
-		@_lifetime(copy self)
-		get {
-			let i = Fdt.StringIndex(offset: UInt32(offset))
-			let bytes = fdt.strings[i]
-			let span = Span<UInt8>(_bytes: bytes)
-			let utf8 = UTF8Span(unchecked: span, isKnownASCII: true)
-			return utf8
-		}
-	}
-
 	var nameWithoutAddress: UTF8Span {
 		@_lifetime(copy self)
 		get {
-			let name = name
 			for i in name.span.indices {
 				if name.span[i] == UInt8(ascii: "@") {
 					return UTF8Span(unchecked: name.span.extracting(..<i), isKnownASCII: true)
@@ -52,62 +53,47 @@ public extension FdtNode {
 
 	var children: FdtChildren {
 		@_lifetime(copy self)
-		get { FdtChildren(self) }
+		get { FdtChildren(at: cursor) }
 	}
 
 	var properties: FdtProperties {
 		@_lifetime(copy self)
-		get { FdtProperties(node: self) }
+		get { FdtProperties(at: cursor) }
 	}
 }
 
-/// The `#address-cells` and `#size-cells` properties of a node.
-public struct AddressSpaceProperties : Sendable {
-	/// The `#address-cells` property.
-	public var address_cells: UInt32
-	/// The `#size-cells` property.
-	public var size_cells: UInt32
-}
-
-public extension AddressSpaceProperties {
-	static let `default` = AddressSpaceProperties(address_cells: 0, size_cells: 0)
-}
-
 public struct FdtChildren : ~Escapable {
-	@usableFromInline let node: FdtNode
+	@usableFromInline var cursor: FdtCursor
 
-	@_lifetime(copy node)
+	@_lifetime(copy cursor)
 	@usableFromInline
-	init(_ node: FdtNode) {
-		self.node = node
+	init(at cursor: FdtCursor) {
+		self.cursor = cursor
 	}
 }
 
 public extension FdtChildren {
+	/// Optimize the internal state for multiple iterations.
+	@inlinable
+	mutating func prepare() throws(Fdt.ParsingError) {
+		try cursor.skipToChildren()
+	}
+
 	@_lifetime(copy self)
 	@inlinable
 	func makeIterableIterator() -> FdtChildIter {
-		var offset = node.offset
-		// Skip FDT_BEGIN_NODE
-		offset += FDT_TAGSIZE
-		offset = (try? node.fdt.find_string_end(from: offset)) ?? offset
-		offset = Fdt.align_tag_offset(offset)
-		return FdtChildIter(fdt: node.fdt, space: node.parent_address_space, offset: offset)
+		FdtChildIter(cursor: cursor)
 	}
 }
 
 /// An iterator over the children of a device tree node.
 public struct FdtChildIter : ~Escapable {
-	@usableFromInline let fdt: Fdt
-	@usableFromInline let space: AddressSpaceProperties
-	@usableFromInline var offset: UInt
+	@usableFromInline var cursor: FdtCursor
 
-	@_lifetime(copy fdt)
+	@_lifetime(copy cursor)
 	@usableFromInline
-	init(fdt: Fdt, space: AddressSpaceProperties, offset: UInt) {
-		self.fdt = fdt
-		self.space = space
-		self.offset = offset
+	init(cursor: FdtCursor) {
+		self.cursor = cursor
 	}
 }
 
@@ -115,20 +101,12 @@ public extension FdtChildIter {
 	@_lifetime(copy self)
 	@inlinable
 	mutating func next() throws(Fdt.ParsingError) -> FdtNode? {
-		while true {
-			let token = try fdt.token(at: offset)
-			switch token {
-			case .begin_node:
-				let node_offset = offset
-				offset = try fdt.next_sibling_offset(from: offset)
-				return FdtNode(at: node_offset, in: fdt, space: space)
-			case .prop:
-				offset = try fdt.next_property_offset(from: offset + FDT_TAGSIZE, check_name: false)
-			case .end_node, .end:
-				return nil
-			case .nop:
-				offset += FDT_TAGSIZE
+		while let item = try cursor.next() {
+			switch item {
+			case let .node(node): return node
+			case .property: continue
 			}
 		}
+		return nil
 	}
 }

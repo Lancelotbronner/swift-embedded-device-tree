@@ -18,7 +18,7 @@ var FDT_TAGSIZE: UInt {
 
 /// A read-only zero-copy view into a flattened device tree.
 public struct Fdt : ~Escapable {
-	var bytes: RawSpan
+	@usableFromInline var bytes: RawSpan
 }
 
 public extension Fdt {
@@ -46,11 +46,14 @@ public extension Fdt {
 		_read { yield bytes.unsafeLoad(as: FdtHeader.self) }
 	}
 
+	var cursor: FdtCursor {
+		@_lifetime(copy self)
+		get { FdtCursor(at: UInt(header.off_dt_struct.byteSwapped), of: self) }
+	}
+
 	var root: FdtNode {
 		@_lifetime(copy self)
-		get {
-			FdtNode(at: header.off_dt_struct.byteSwapped, in: self)
-		}
+		get throws(Fdt.ParsingError) { try FdtNode(at: cursor) }
 	}
 
 	var mem_rsvmap: ReservedMemoryMap {
@@ -80,6 +83,7 @@ public extension Fdt {
 		public let kind: Kind
 		public let offset: UInt
 
+		@usableFromInline
 		init(_ kind: Kind, at offset: some FixedWidthInteger) {
 			self.kind = kind
 			self.offset = UInt(offset)
@@ -102,6 +106,7 @@ public extension Fdt {
 			case invalidString
 			case invalidOffset
 			case invalidNodeName
+			case invalidPropertyName
 			case invalidToken(UInt32)
 			case badToken(FdtToken)
 		}
@@ -270,6 +275,24 @@ extension Fdt {
 				offset += FDT_TAGSIZE
 			case .end:
 				throw ParsingError(.badToken(.end), at: offset)
+			}
+		}
+	}
+
+	@usableFromInline
+	func skip_props(from offset: UInt) throws(ParsingError) -> UInt? {
+		var offset = offset
+		while true {
+			let token = try token(at: offset)
+			switch token {
+			case .begin_node:
+				return offset
+			case .prop:
+				offset = try next_property_offset(from: offset + FDT_TAGSIZE, check_name: false)
+			case .end_node, .end:
+				return nil
+			case .nop:
+				offset += FDT_TAGSIZE
 			}
 		}
 	}

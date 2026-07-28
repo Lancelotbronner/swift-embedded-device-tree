@@ -1,5 +1,5 @@
 //
-//  CString.swift
+//  FdtValues.swift
 //  swift-embedded-device-tree
 //
 //  Created by Christophe Bronner on 2026-07-27.
