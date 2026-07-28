@@ -54,6 +54,11 @@ public extension FdtNode {
 		@_lifetime(copy self)
 		get { FdtChildren(self) }
 	}
+
+	var properties: FdtProperties {
+		@_lifetime(copy self)
+		get { FdtProperties(node: self) }
+	}
 }
 
 /// The `#address-cells` and `#size-cells` properties of a node.
@@ -86,7 +91,7 @@ public extension FdtChildren {
 		// Skip FDT_BEGIN_NODE
 		offset += FDT_TAGSIZE
 		offset = (try? node.fdt.find_string_end(from: offset)) ?? offset
-		offset = node.fdt.align_tag_offset(offset)
+		offset = Fdt.align_tag_offset(offset)
 		return FdtChildIter(fdt: node.fdt, space: node.parent_address_space, offset: offset)
 	}
 }

@@ -55,40 +55,55 @@ func `name outlives fdt and node`() throws {
 	#expect(t1)
 }
 
-//#[test]
-//fn read_prop_values() {
-//	let dtb = include_bytes!("dtb/test_props.dtb");
-//	let fdt = Fdt::new(dtb).unwrap();
-//	let root = fdt.root();
-//	let mut children = root.children();
-//	let node = children.next().unwrap();
-//	assert_eq!(node.name(), "test-props");
-//
-//	let mut props = node.properties();
-//
-//	let prop = props.next().unwrap();
-//	assert_eq!(prop.name(), "u32-prop");
-//	assert_eq!(prop.as_u32().unwrap(), 0x1234_5678);
-//
-//	let prop = props.next().unwrap();
-//	assert_eq!(prop.name(), "u64-prop");
-//	assert_eq!(prop.as_u64().unwrap(), 0x1122_3344_5566_7788);
-//
-//	let prop = props.next().unwrap();
-//	assert_eq!(prop.name(), "str-prop");
-//	assert_eq!(prop.as_str().unwrap(), "hello world");
-//
-//	let prop = props.next().unwrap();
-//	assert_eq!(prop.name(), "str-list-prop");
-//	let mut str_list = prop.as_str_list();
-//	assert_eq!(str_list.next(), Some("first"));
-//	assert_eq!(str_list.next(), Some("second"));
-//	assert_eq!(str_list.next(), Some("third"));
-//	assert_eq!(str_list.next(), None);
-//
-//	assert!(props.next().is_none());
-//}
-//
+@Test
+func `read prop values`() throws {
+	let dtb = try include_bytes("test_props")
+	let fdt = try Fdt(parsing: dtb.bytes)
+	let root = fdt.root
+	var children = root.children.makeIterableIterator()
+	let node = try children.next()!
+
+	let t1 = node.name.charactersEqual(to: "test-props")
+	print(String(copying: root.name))
+	#expect(t1)
+
+	var properties = node.properties.makeIterableIterator()
+	var prop = try properties.next()!
+
+	let t2 = prop.name.charactersEqual(to: "u32-prop")
+	#expect(t2)
+	let t3 = try prop.asUInt32()
+	#expect(t3 == 0x1234_5678)
+
+	prop = try properties.next()!
+	let t4 = prop.name.charactersEqual(to: "u64-prop")
+	#expect(t4)
+	let t5 = try prop.asUInt64()
+	#expect(t5 == 0x1122_3344_5566_7788)
+
+	prop = try properties.next()!
+	let t6 = prop.name.charactersEqual(to: "str-prop")
+	#expect(t6)
+	let t7 = try prop.asStr().charactersEqual(to: "hello world")
+	#expect(t7)
+
+	prop = try properties.next()!
+	let t8 = prop.name.charactersEqual(to: "str-list-prop")
+	#expect(t8)
+	var list = try prop.asStringList().makeIterableIterator()
+	let t9 = list.next()!.charactersEqual(to: "first")
+	#expect(t9)
+	let t10 = list.next()!.charactersEqual(to: "first")
+	#expect(t10)
+	let t11 = list.next()!.charactersEqual(to: "first")
+	#expect(t11)
+	let t12 = list.next() == nil
+	#expect(t12)
+
+	let t13 = try properties.next() == nil
+	#expect(t13)
+}
+
 //#[test]
 //fn get_property_by_name() {
 //	let dtb = include_bytes!("dtb/test_props.dtb");
