@@ -16,20 +16,18 @@ public struct FdtProperty : ~Escapable {
 		self.bytes = bytes
 	}
 
-	@_lifetime(copy fdt)
+	@_lifetime(copy cursor)
 	@usableFromInline
-	init(at offset: UInt, of fdt: Fdt) throws(Fdt.ParsingError) {
-		let header = fdt.bytes
-			.unsafeLoad(fromByteOffset: Int(bitPattern: offset), as: FdtPropertyHeader.self)
-			.byteSwapped
+	init(at cursor: inout FdtCursor) throws(Fdt.ParsingError) {
+		let header = try cursor.propertyHeader()
 
-		let nameBytes = try fdt.string(at: UInt(header.nameoff))
+		let nameBytes = cursor.fdt.strings[header.nameoff]
 		name = FdtName(bytes: nameBytes)
 
-		let valueOffset = offset + 3 * FDT_TAGSIZE
-		bytes = fdt.bytes
-			.extracting(droppingFirst: Int(valueOffset))
+		bytes = cursor.fdt.bytes
+			.extracting(droppingFirst: Int(bitPattern: cursor.offset))
 			.extracting(first: Int(header.len))
+		cursor.offset += UInt(header.len)
 	}
 
 	/// The size of this property in bytes.
@@ -55,17 +53,17 @@ public extension FdtProperty {
 		guard bytes.byteCount == MemoryLayout<T>.size else {
 			throw .invalidLength(expected: MemoryLayout<T>.size, got: bytes.byteCount)
 		}
-		return bytes.unsafeLoad(as: T.self)
+		return bytes.unsafeLoadUnaligned(as: T.self)
 	}
 
 	@inlinable
 	func asUInt32() throws(FdtPropertyError) -> UInt32 {
-		try self.unsafeLoad(as: UInt32.self).byteSwapped
+		try unsafeLoad(as: UInt32.self).byteSwapped
 	}
 
 	@inlinable
 	func asUInt64() throws(FdtPropertyError) -> UInt64 {
-		try self.unsafeLoad(as: UInt64.self).byteSwapped
+		try unsafeLoad(as: UInt64.self).byteSwapped
 	}
 
 	@_lifetime(copy self)

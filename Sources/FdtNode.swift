@@ -64,6 +64,28 @@ public extension FdtNode {
 		@_lifetime(copy self)
 		get { FdtProperties(at: cursor) }
 	}
+
+	@_lifetime(copy self)
+	func property(_ name: StaticString) throws(Fdt.ParsingError) -> FdtProperty? {
+		var iter = properties.makeIterableIterator()
+		while let prop = try iter.next() {
+			if prop.name == name {
+				return prop
+			}
+		}
+		return nil
+	}
+
+	@_lifetime(copy self)
+	func child(_ name: StaticString) throws(Fdt.ParsingError) -> FdtNode? {
+		var iter = children.makeIterableIterator()
+		while let child = try iter.next() {
+			if child.name == name {
+				return child
+			}
+		}
+		return nil
+	}
 }
 
 public struct FdtChildren : ~Escapable {

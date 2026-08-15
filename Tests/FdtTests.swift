@@ -104,24 +104,29 @@ func `read prop values`() throws {
 	#expect(t13)
 }
 
-//#[test]
-//fn get_property_by_name() {
-//	let dtb = include_bytes!("dtb/test_props.dtb");
-//	let fdt = Fdt::new(dtb).unwrap();
-//	let root = fdt.root();
-//	let node = root.child("test-props").unwrap();
-//
-//	let prop = node.property("u32-prop").unwrap();
-//	assert_eq!(prop.name(), "u32-prop");
-//	assert_eq!(prop.as_u32().unwrap(), 0x1234_5678);
-//
-//	let prop = node.property("str-prop").unwrap();
-//	assert_eq!(prop.name(), "str-prop");
-//	assert_eq!(prop.as_str().unwrap(), "hello world");
-//
-//	assert!(node.property("non-existent-prop").is_none());
-//}
-//
+@Test
+func `get property by name`() throws {
+	let dtb = try include_bytes("test_props")
+	let fdt = try Fdt(parsing: dtb.bytes)
+	let root = try fdt.root
+	let node = try root.child("test-props")!
+
+	let p1 = try node.property("u32-prop")!
+	let t1 = p1.name == "u32-prop"
+	#expect(t1)
+	let t2 = try p1.asUInt32() == 0x1234_5678
+	#expect(t2)
+
+	let p2 = try node.property("str-prop")!
+	let t3 = p2.name == "str-prop"
+	#expect(t3)
+	let t4 = try p2.asString().charactersEqual(to: "hello world")
+	#expect(t4)
+
+	let t5 = try node.property("non-existent-prop") == nil
+	#expect(t5)
+}
+
 //#[test]
 //fn standard_properties() {
 //	let dtb = include_bytes!("dtb/test_props.dtb");

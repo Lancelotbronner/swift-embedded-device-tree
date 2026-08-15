@@ -93,8 +93,7 @@ public extension FdtCursor {
 				return .node(node)
 			case .prop:
 				offset += FDT_TAGSIZE
-				let prop = try FdtProperty(at: offset, of: fdt)
-				offset += prop.size
+				let prop = try FdtProperty(at: &self)
 				align()
 				return .property(prop)
 			case .end_node:

@@ -156,15 +156,20 @@ public extension Fdt {
 }
 
 public extension Fdt.Strings {
-	subscript(position: Fdt.StringIndex) -> RawSpan {
+	internal subscript(position: UInt32) -> RawSpan {
 		@_lifetime(copy self)
 		get {
-			let bytes = bytes.extracting(droppingFirst: Int(position.offset))
+			let bytes = bytes.extracting(droppingFirst: Int(position))
 			for i in bytes.byteOffsets where bytes[i] == 0 {
-				return bytes.extracting(first: i)
+				return bytes.extracting(first: i + 1)
 			}
 			return RawSpan()
 		}
+	}
+
+	subscript(position: Fdt.StringIndex) -> RawSpan {
+		@_lifetime(copy self)
+		get { self[position.offset] }
 	}
 
 	@_lifetime(copy self)
@@ -321,13 +326,15 @@ extension Fdt {
 		guard bytes.byteOffsets.contains(Int(bitPattern: offset)) else {
 			throw ParsingError(.invalidOffset, at: offset)
 		}
-		let slice = if let end {
-			bytes.extracting(Int(bitPattern: offset)...Int(bitPattern: end))
+		var str = bytes.extracting(droppingFirst: Int(bitPattern: offset))
+		if let end {
+			str = str.extracting(first: Int(bitPattern: end - offset))
 		} else {
-			bytes.extracting(Int(bitPattern: offset)...)
+			for i in 0..<str.byteCount where str[i] == 0 {
+				return str.extracting(first: i + 1)
+			}
 		}
-		//TODO: adjust to last null
-		return slice
+		return str
 	}
 
 	@usableFromInline
